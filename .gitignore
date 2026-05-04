@@ -11,3 +11,6 @@ desktop.ini
 # Dependency folders, if tools are added later
 node_modules/
 .cache/
+
+# Local memo
+memo.txt
