@@ -4483,13 +4483,13 @@ function showTitle() {
 
 // ===== LOOP =====
 let _lastTime = 0;
-const _FRAME_MS = 1000 / 60;
+const _FRAME_MS = 1000 / 60 - 1; // 約15.67ms：60Hzで毎フレーム確実に通過、144Hzで約48fpsに制限
 
 function loop(ts) {
   requestAnimationFrame(loop);
   const elapsed = ts - _lastTime;
   if (elapsed < _FRAME_MS) return;
-  _lastTime = ts - (elapsed % _FRAME_MS);
+  _lastTime = ts;
   updateBootLogoFx();
   updateTitleMusicFx();
   if (state === 'play' && !paused) {
