@@ -2233,60 +2233,65 @@ function spawnParticles(x, y, _color, count = 12) {
 }
 
 // ===== DRAW: 背景 =====
+let bgCache = null;
+let cloudCaches = [];
+
 function drawBackground() {
-  const grd = ctx.createLinearGradient(0, 0, 0, H);
+  ctx.drawImage(bgCache, 0, 0);
+}
+
+function initBgCache() {
+  bgCache = document.createElement('canvas');
+  bgCache.width = W; bgCache.height = H;
+  const bc = bgCache.getContext('2d');
+  const grd = bc.createLinearGradient(0, 0, 0, H);
   grd.addColorStop(0,    C.bgTop);
   grd.addColorStop(0.45, C.bgMid);
   grd.addColorStop(1,    C.bgBot);
-  ctx.fillStyle = grd;
-  ctx.fillRect(0, 0, W, H);
-
-  ctx.save();
-  ctx.globalAlpha = 0.32;
-  ctx.fillStyle = C.pink;
+  bc.fillStyle = grd;
+  bc.fillRect(0, 0, W, H);
+  bc.globalAlpha = 0.32;
+  bc.fillStyle = C.pink;
+  bc.beginPath();
   for (let y = 28; y < H; y += 26) {
     for (let x = 18; x < W; x += 26) {
       if ((x + y) % 78 === 0) {
-        ctx.beginPath();
-        ctx.arc(x, y, 1.4, 0, Math.PI * 2);
-        ctx.fill();
+        bc.moveTo(x + 1.4, y);
+        bc.arc(x, y, 1.4, 0, Math.PI * 2);
       }
     }
   }
-  ctx.globalAlpha = 1;
-
+  bc.fill();
+  bc.globalAlpha = 1;
   const streaks = [
     { x: W - 105, y: 150, w: 92, color: C.yellow, rot: -0.7 },
     { x: W - 72, y: 520, w: 112, color: C.mint, rot: -0.35 },
     { x: 52, y: 610, w: 82, color: C.pink, rot: 0.28 },
   ];
   streaks.forEach(s => {
-    ctx.save();
-    ctx.translate(s.x, s.y);
-    ctx.rotate(s.rot);
-    ctx.fillStyle = s.color;
-    ctx.beginPath();
-    ctx.roundRect(-s.w / 2, -4, s.w, 8, 8);
-    ctx.fill();
-    ctx.restore();
+    bc.save();
+    bc.translate(s.x, s.y);
+    bc.rotate(s.rot);
+    bc.fillStyle = s.color;
+    bc.beginPath();
+    bc.roundRect(-s.w / 2, -4, s.w, 8, 8);
+    bc.fill();
+    bc.restore();
   });
-
-  ctx.fillStyle = C.pink;
-  ctx.beginPath();
-  ctx.arc(-35, H - 70, 105, 0, Math.PI * 2);
-  ctx.arc(82, H - 20, 96, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = C.outline;
-  ctx.beginPath();
-  ctx.moveTo(0, H - 22);
-  ctx.bezierCurveTo(120, H - 110, 215, H + 15, 340, H - 44);
-  ctx.bezierCurveTo(430, H - 86, 488, H - 18, W, H - 70);
-  ctx.lineTo(W, H);
-  ctx.lineTo(0, H);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
+  bc.fillStyle = C.pink;
+  bc.beginPath();
+  bc.arc(-35, H - 70, 105, 0, Math.PI * 2);
+  bc.arc(82, H - 20, 96, 0, Math.PI * 2);
+  bc.fill();
+  bc.fillStyle = C.outline;
+  bc.beginPath();
+  bc.moveTo(0, H - 22);
+  bc.bezierCurveTo(120, H - 110, 215, H + 15, 340, H - 44);
+  bc.bezierCurveTo(430, H - 86, 488, H - 18, W, H - 70);
+  bc.lineTo(W, H);
+  bc.lineTo(0, H);
+  bc.closePath();
+  bc.fill();
 }
 
 // ===== DRAW: 雲 =====
@@ -2302,6 +2307,28 @@ function drawCloud(x, y, scale, alpha) {
   ctx.fillStyle = '#FFFFFF';
   ctx.beginPath(); ctx.ellipse(-10*scale, -8*scale, 25*scale, 10*scale, -0.18, 0, Math.PI*2); ctx.fill();
   ctx.restore();
+}
+
+function initCloudCaches() {
+  cloudCaches = clouds.map(c => {
+    const sc = c.scale;
+    const pad = 6;
+    const cw = Math.ceil(96 * sc) + pad * 2;
+    const ch = Math.ceil(43 * sc) + pad * 2;
+    const ox = Math.ceil(48 * sc) + pad;
+    const oy = Math.ceil(23 * sc) + pad;
+    const cc = document.createElement('canvas');
+    cc.width = cw; cc.height = ch;
+    const ct = cc.getContext('2d');
+    ct.fillStyle = '#FFF8ED';
+    [[0,0,22],[26,6,15],[-26,6,15],[13,-10,13],[-13,-10,13],[38,10,10],[-38,10,10]].forEach(([cx,cy,r]) => {
+      ct.beginPath(); ct.arc(ox + cx*sc, oy + cy*sc, r*sc, 0, Math.PI*2); ct.fill();
+    });
+    ct.globalAlpha = 0.2;
+    ct.fillStyle = '#FFFFFF';
+    ct.beginPath(); ct.ellipse(ox + (-10*sc), oy + (-8*sc), 25*sc, 10*sc, -0.18, 0, Math.PI*2); ct.fill();
+    return { canvas: cc, ox, oy };
+  });
 }
 
 // ===== DRAW: キラキラ星 =====
@@ -4223,8 +4250,32 @@ function draw() {
     }
     ctx.restore();
   }
-  clouds.forEach(c => drawCloud(c.x, c.y, c.scale, c.alpha));
-  stars.forEach(s => drawSparkle(s.x, s.y, s.r, s.color, s.alpha, s.rot));
+  clouds.forEach((c, i) => {
+    const cc = cloudCaches[i];
+    if (!cc) return;
+    ctx.save();
+    ctx.globalAlpha = c.alpha;
+    ctx.drawImage(cc.canvas, c.x - cc.ox, c.y - cc.oy);
+    ctx.restore();
+  });
+  ctx.save();
+  stars.forEach(s => {
+    ctx.globalAlpha = s.alpha;
+    ctx.fillStyle = s.color;
+    ctx.beginPath();
+    for (let i = 0; i < 4; i++) {
+      const a1 = (i/4)*Math.PI*2 + s.rot, a2 = a1+Math.PI/4;
+      ctx.lineTo(s.x + Math.cos(a1)*s.r, s.y + Math.sin(a1)*s.r);
+      ctx.lineTo(s.x + Math.cos(a2)*s.r*0.32, s.y + Math.sin(a2)*s.r*0.32);
+    }
+    ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = s.alpha * 0.55;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(s.x - Math.cos(s.rot)*s.r*0.2, s.y - Math.sin(s.rot)*s.r*0.2, s.r*0.22, 0, Math.PI*2);
+    ctx.fill();
+  });
+  ctx.restore();
 
   if (state === 'play' || state === 'upgrade') {
     particles.forEach(p => drawParticle(p));
@@ -4431,7 +4482,14 @@ function showTitle() {
 }
 
 // ===== LOOP =====
-function loop() {
+let _lastTime = 0;
+const _FRAME_MS = 1000 / 60;
+
+function loop(ts) {
+  requestAnimationFrame(loop);
+  const elapsed = ts - _lastTime;
+  if (elapsed < _FRAME_MS) return;
+  _lastTime = ts - (elapsed % _FRAME_MS);
   updateBootLogoFx();
   updateTitleMusicFx();
   if (state === 'play' && !paused) {
@@ -4439,7 +4497,6 @@ function loop() {
     else update();
   }
   draw();
-  requestAnimationFrame(loop);
 }
 
 // ===== 起動 =====
@@ -4468,6 +4525,8 @@ Promise.all([
   initBgm();
   initStars();
   initClouds();
+  initBgCache();
+  initCloudCaches();
   initGame();
   if (DEBUG_BOSS) {
     bootScreen.style.display = 'none';
